@@ -514,6 +514,8 @@ public class AmbientActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        pairingHandler.removeCallbacks(pairingRefresh);
+        pairingView = null;
         if (current == this) current = null;
         if (tts != null) tts.shutdown();
         stopVoice();
