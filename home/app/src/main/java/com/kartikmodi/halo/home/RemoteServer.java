@@ -88,19 +88,35 @@ final class RemoteServer {
             String method = parts[0];
             String target = parts[1];
             int contentLength = 0;
+            Map<String, String> headers = new HashMap<>();
             String line;
             while ((line = readLine(in)) != null && !line.isEmpty()) {
                 int colon = line.indexOf(':');
-                if (colon > 0 && line.substring(0, colon).trim().equalsIgnoreCase("content-length")) {
-                    contentLength = Integer.parseInt(line.substring(colon + 1).trim());
+                if (colon > 0) {
+                    String name = line.substring(0, colon).trim().toLowerCase(java.util.Locale.ROOT);
+                    String value = line.substring(colon + 1).trim();
+                    headers.put(name, value);
+                    if ("content-length".equals(name)) {
+                        contentLength = Integer.parseInt(value);
+                    }
                 }
             }
-            byte[] body = new byte[Math.min(contentLength, 64 * 1024)];
+            if (contentLength < 0 || contentLength > 64 * 1024) {
+                send(socket.getOutputStream(), 413, "text/plain",
+                        "Request too large".getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+            byte[] body = new byte[contentLength];
             int read = 0;
             while (read < body.length) {
                 int n = in.read(body, read, body.length - read);
                 if (n < 0) break;
                 read += n;
+            }
+            if (read != body.length) {
+                send(socket.getOutputStream(), 400, "text/plain",
+                        "Incomplete request body".getBytes(StandardCharsets.UTF_8));
+                return;
             }
             String path = target;
             Map<String, String> query = new HashMap<>();
@@ -112,7 +128,8 @@ final class RemoteServer {
                     if (eq > 0) query.put(decode(pair.substring(0, eq)), decode(pair.substring(eq + 1)));
                 }
             }
-            route(socket.getOutputStream(), method, path, query, new String(body, 0, read, StandardCharsets.UTF_8));
+            route(socket.getOutputStream(), method, path, query, headers,
+                    new String(body, 0, read, StandardCharsets.UTF_8));
         } catch (Exception e) {
             Log.w(TAG, "request failed", e);
         }
@@ -143,7 +160,6 @@ final class RemoteServer {
                 + "Content-Type: " + type + "\r\n"
                 + "Content-Length: " + body.length + "\r\n"
                 + "Cache-Control: no-store\r\n"
-                + "Access-Control-Allow-Origin: *\r\n"
                 + "Connection: close\r\n\r\n";
         out.write(head.getBytes(StandardCharsets.UTF_8));
         out.write(body);
@@ -156,7 +172,8 @@ final class RemoteServer {
 
     // ---- Routes
 
-    private void route(OutputStream out, String method, String path, Map<String, String> query, String body)
+    private void route(OutputStream out, String method, String path, Map<String, String> query,
+                       Map<String, String> headers, String body)
             throws IOException, JSONException {
         switch (path) {
             case "/":
