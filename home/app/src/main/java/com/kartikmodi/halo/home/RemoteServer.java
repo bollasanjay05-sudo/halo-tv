@@ -129,7 +129,7 @@ final class RemoteServer {
                 }
             }
             route(socket.getOutputStream(), method, path, query, headers,
-                    new String(body, 0, read, StandardCharsets.UTF_8));
+                    new String(body, 0, read, StandardCharsets.UTF_8), socket.getInetAddress().isLoopbackAddress());
         } catch (Exception e) {
             Log.w(TAG, "request failed", e);
         }
@@ -173,8 +173,12 @@ final class RemoteServer {
     // ---- Routes
 
     private void route(OutputStream out, String method, String path, Map<String, String> query,
-                       Map<String, String> headers, String body)
+                       Map<String, String> headers, String body, boolean loopback)
             throws IOException, JSONException {
+        if ("/api/tv/sync".equals(path) && !loopback) {
+            send(out, 403, "text/plain", "Local TV only".getBytes(StandardCharsets.UTF_8));
+            return;
+        }
         switch (path) {
             case "/":
                 serveAsset(out, "ambient/phone.html", "text/html; charset=utf-8");
