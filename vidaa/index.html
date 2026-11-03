@@ -5,15 +5,17 @@
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#080d19;color:#f7f9ff;font-family:Arial,Helvetica,sans-serif}
 body{background:radial-gradient(ellipse at 75% 20%,#283f67 0%,transparent 48%),radial-gradient(ellipse at 10% 90%,#292340 0%,transparent 50%),#080d19}
 main{padding:4vw;min-height:100vh}header{display:flex;justify-content:space-between;align-items:center;gap:20px}.brand{font-size:28px;letter-spacing:5px;font-weight:bold}.tag{color:#b3c4db;font-size:16px}
-.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:22px;margin-top:5vh}.card{background:rgba(255,255,255,.085);border:1px solid rgba(255,255,255,.2);border-radius:26px;padding:34px;box-shadow:0 20px 60px rgba(0,0,0,.15)}.clock{font-size:clamp(80px,12vw,210px);font-weight:bold;line-height:1;letter-spacing:-.07em;margin:16px 0}.date{font-size:clamp(18px,2.4vw,32px);color:#d0dcf1}.label{font-size:18px;letter-spacing:3px;text-transform:uppercase;color:#9eb6d6}.temp{font-size:clamp(60px,8vw,120px);font-weight:bold;margin:24px 0 8px}.sub{font-size:20px;color:#c0d1e7;line-height:1.5}.wide{grid-column:1/-1}.actions{display:flex;gap:16px;flex-wrap:wrap;margin-top:20px}button{background:#dae9ff;color:#13233b;border:0;border-radius:14px;padding:15px 22px;font-size:20px;font-weight:bold;cursor:pointer}button:focus{outline:5px solid #ffbb55;outline-offset:3px}.hint{font-size:15px;color:#a9bcd6;margin-top:20px}#status{color:#ffc984}#weather{min-height:190px}@media(max-width:750px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.card{padding:22px}.clock{font-size:22vw}}
+.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:22px;margin-top:5vh}.card{background:rgba(255,255,255,.085);border:1px solid rgba(255,255,255,.2);border-radius:26px;padding:34px;box-shadow:0 20px 60px rgba(0,0,0,.15)}.clock{font-size:clamp(80px,12vw,210px);font-weight:bold;line-height:1;letter-spacing:-.07em;margin:16px 0}.date{font-size:clamp(18px,2.4vw,32px);color:#d0dcf1}.label{font-size:18px;letter-spacing:3px;text-transform:uppercase;color:#9eb6d6}.temp{font-size:clamp(60px,8vw,120px);font-weight:bold;margin:24px 0 8px}.sub{font-size:20px;color:#c0d1e7;line-height:1.5}.wide{grid-column:1/-1}.actions{display:flex;gap:16px;flex-wrap:wrap;margin-top:20px}button{background:#dae9ff;color:#13233b;border:0;border-radius:14px;padding:15px 22px;font-size:20px;font-weight:bold;cursor:pointer}button:focus{outline:5px solid #ffbb55;outline-offset:3px}input{min-width:250px;max-width:100%;padding:14px 18px;border-radius:14px;border:2px solid #7286a5;background:#182842;color:#fff;font-size:20px}input:focus{outline:5px solid #ffbb55}button[disabled]{opacity:.5}.hint{font-size:15px;color:#a9bcd6;margin-top:20px}#status{color:#ffc984}#weather{min-height:190px}@media(max-width:750px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.card{padding:22px}.clock{font-size:22vw}}
 </style></head><body><main>
 <header><div class="brand">◉ HALO TV</div><div class="tag">VIDAA Browser Edition · Free preview</div></header>
 <div class="grid">
 <section class="card"><div class="label">Local time</div><div class="clock" id="clock">--:--</div><div class="date" id="date">Loading date…</div></section>
 <section class="card" id="weather"><div class="label">Weather · Riga</div><div class="temp" id="temp">--°</div><div class="sub" id="conditions">Loading current conditions…</div></section>
 <section class="card wide"><div class="label">Ambient dashboard</div><p class="sub">HALO TV is running directly in your Hisense browser — no APK, external box, or paid service required.</p>
-<div class="actions"><button id="refresh">Refresh weather</button><button id="fullscreen">Full screen</button></div>
+<div class="actions"><button id="refresh">Refresh weather</button><button id="fullscreen">Full screen</button><button id="settingsBtn">Settings</button></div>
+<div id="settings" hidden style="margin-top:22px"><label class="sub" for="city">Weather location</label><div class="actions"><input id="city" placeholder="City (e.g. Riga)" maxlength="80"><button id="saveCity">Save city</button></div><p class="hint" id="cityStatus">City search uses Open-Meteo.</p></div>
 <p class="hint" id="status">This preview includes the clock and live weather. Phone control, Android launcher integration, voice control, and YouTube playback are not enabled in this browser version.</p></section>
+<section class="card" style="margin-top:22px"><div class="label">Notes</div><p class="sub">Saved on this TV browser only.</p><div class="actions"><input id="noteInput" maxlength="180" placeholder="Write a reminder"><button id="addNote">Add note</button></div><ul id="notes" class="sub"></ul><p class="hint">Select a note and press OK to remove it.</p></section>
 </div></main>
 <script>
 (function(){
@@ -21,17 +23,26 @@ main{padding:4vw;min-height:100vh}header{display:flex;justify-content:space-betw
 function byId(id){return document.getElementById(id);}
 function tick(){var d=new Date();byId('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);byId('date').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
 tick();setInterval(tick,1000);
+var savedCity={name:'Riga',latitude:56.9496,longitude:24.1052,timezone:'Europe/Riga'};try{var stored=JSON.parse(localStorage.getItem('halo-city')||'null');if(stored&&typeof stored.latitude==='number'&&typeof stored.longitude==='number')savedCity=stored;}catch(e){}
 function weather(){
 byId('status').textContent='Checking weather…';
-var url='https://api.open-meteo.com/v1/forecast?latitude=56.9496&longitude=24.1052&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=Europe%2FRiga';
+document.querySelector('#weather .label').textContent='Weather · '+savedCity.name;
+var url='https://api.open-meteo.com/v1/forecast?latitude='+encodeURIComponent(savedCity.latitude)+'&longitude='+encodeURIComponent(savedCity.longitude)+'&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto';
 fetch(url).then(function(r){if(!r.ok)throw Error('Weather service unavailable');return r.json();}).then(function(j){
 var w=j.current;if(!w)throw Error('No weather data');
 byId('temp').textContent=Math.round(w.temperature_2m)+'°';
 byId('conditions').textContent='Humidity '+w.relative_humidity_2m+'% · Wind '+Math.round(w.wind_speed_10m)+' km/h';
-byId('status').textContent='Weather updated. Browser preview mode; no remote control or Jarvis connection.';
+byId('status').textContent='Weather updated. Notes and weather location are stored in this browser.';
 }).catch(function(){byId('conditions').textContent='Weather unavailable. Check internet access.';byId('status').textContent='Clock works offline; live weather needs internet.';});
 }
 byId('refresh').onclick=weather;
+byId('settingsBtn').onclick=function(){var p=byId('settings');p.hidden=!p.hidden;if(!p.hidden){byId('city').value=savedCity.name;byId('city').focus();}};
+byId('saveCity').onclick=function(){var name=byId('city').value.trim();if(!name)return;byId('cityStatus').textContent='Searching…';fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name='+encodeURIComponent(name)).then(function(r){if(!r.ok)throw Error();return r.json();}).then(function(j){if(!j.results||!j.results.length)throw Error();var x=j.results[0];savedCity={name:x.name+(x.country?', '+x.country:''),latitude:x.latitude,longitude:x.longitude,timezone:x.timezone};try{localStorage.setItem('halo-city',JSON.stringify(savedCity));}catch(e){}byId('cityStatus').textContent='Saved: '+savedCity.name;weather();}).catch(function(){byId('cityStatus').textContent='City not found or network unavailable.';});};
+var notes=[];try{var storedNotes=JSON.parse(localStorage.getItem('halo-notes')||'[]');if(Array.isArray(storedNotes))notes=storedNotes.filter(function(x){return typeof x==='string';}).slice(0,12);}catch(e){}
+function renderNotes(){var list=byId('notes');list.textContent='';notes.forEach(function(n,i){var li=document.createElement('li');var b=document.createElement('button');b.textContent='✕ '+n;b.style.margin='6px';b.onclick=function(){notes.splice(i,1);saveNotes();};li.appendChild(b);list.appendChild(li);});}
+function saveNotes(){try{localStorage.setItem('halo-notes',JSON.stringify(notes));}catch(e){}renderNotes();}
+byId('addNote').onclick=function(){var n=byId('noteInput').value.trim();if(!n||notes.length>=12)return;notes.push(n);byId('noteInput').value='';saveNotes();};
+renderNotes();
 byId('fullscreen').onclick=function(){var el=document.documentElement;if(el.requestFullscreen){var p=el.requestFullscreen();if(p&&p.catch)p.catch(function(){byId('status').textContent='Use the TV browser fullscreen option.';});}else{byId('status').textContent='Use the TV browser fullscreen option.';}};
 weather();setInterval(weather,15*60*1000);
 })();
