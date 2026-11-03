@@ -1,6 +1,7 @@
 package com.kartikmodi.halo.home;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.Intent;
 import android.content.res.AssetManager;
 import android.util.Log;
@@ -20,6 +21,9 @@ import java.net.Socket;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -49,6 +53,79 @@ final class RemoteServer {
     /** The TV page's last reported state: now playing, queue, notes, volume. */
     private JSONObject tvState = new JSONObject();
     private long lastTvSync;
+    private final SecureRandom random = new SecureRandom();
+    private String pairingPin;
+    private long pinExpiry;
+    private int failedPairs;
+    private long blockedUntil;
+    private static final long PIN_LIFETIME_MS = 5 * 60 * 1000L;
+
+    private SharedPreferences authPrefs() {
+        return app.getSharedPreferences("halo_remote_auth", Context.MODE_PRIVATE);
+    }
+
+    synchronized String pairingPin() {
+        long now = System.currentTimeMillis();
+        if (pairingPin == null || now >= pinExpiry) {
+            pairingPin = String.format(java.util.Locale.ROOT, "%06d", random.nextInt(1000000));
+            pinExpiry = now + PIN_LIFETIME_MS;
+        }
+        return pairingPin;
+    }
+
+    static synchronized String currentPairingPin(Context context) {
+        ensureStarted(context);
+        return instance.pairingPin();
+    }
+
+    private static byte[] digest(String token) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private boolean authorized(Map<String, String> headers) {
+        String auth = headers.get("authorization");
+        if (auth == null || !auth.startsWith("Bearer ")) return false;
+        String stored = authPrefs().getString("token_hash", null);
+        if (stored == null) return false;
+        try {
+            byte[] expected = Base64.getDecoder().decode(stored);
+            return MessageDigest.isEqual(expected, digest(auth.substring(7)));
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    private synchronized void pair(OutputStream out, String body) throws IOException, JSONException {
+        long now = System.currentTimeMillis();
+        if (now < blockedUntil) {
+            send(out, 429, "text/plain", "Too many attempts; wait a minute".getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+        String provided = new JSONObject(body).optString("pin");
+        String current = pairingPin();
+        if (provided.length() != 6 || !MessageDigest.isEqual(
+                provided.getBytes(StandardCharsets.UTF_8), current.getBytes(StandardCharsets.UTF_8))) {
+            if (++failedPairs >= 5) {
+                blockedUntil = now + 60000;
+                failedPairs = 0;
+            }
+            send(out, 403, "text/plain", "Incorrect pairing code".getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+        byte[] secret = new byte[32];
+        random.nextBytes(secret);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(secret);
+        authPrefs().edit().putString("token_hash",
+                Base64.getEncoder().encodeToString(digest(token))).apply();
+        pairingPin = null;
+        failedPairs = 0;
+        sendJson(out, new JSONObject().put("token", token));
+    }
+
 
     static synchronized void ensureStarted(Context context) {
         if (instance != null) return;
@@ -191,6 +268,20 @@ final class RemoteServer {
                         "Cross-origin request blocked".getBytes(StandardCharsets.UTF_8));
                 return;
             }
+        }
+        if ("/api/pair".equals(path)) {
+            if (!"POST".equals(method)) {
+                send(out, 405, "text/plain", "POST required".getBytes(StandardCharsets.UTF_8));
+            } else {
+                pair(out, body);
+            }
+            return;
+        }
+        if (path.startsWith("/api/") && !"/api/tv/sync".equals(path)
+                && !"/api/search".equals(path) && !"/api/suggest".equals(path)
+                && !authorized(headers)) {
+            send(out, 401, "text/plain", "Pair your phone with the TV first".getBytes(StandardCharsets.UTF_8));
+            return;
         }
         switch (path) {
             case "/":
