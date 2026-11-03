@@ -347,7 +347,16 @@
 <!-- Settings -->
 <section class="view" id="view-settings">
   <div class="head"><h1>Settings</h1><span class="status glass" data-status>Connecting…</span></div>
-  <div class="sub" style="margin-top:8px">Weather location</div>
+  <div class="sub" style="margin-top:8px">Pair with HALO TV</div>
+  <div class="group glass" style="padding:14px">
+    <p class="hint" id="pairStatus" style="margin:0 0 12px">Enter the six-digit code displayed on the TV. Keep both devices on the same Wi-Fi.</p>
+    <div style="display:flex;gap:10px">
+      <input id="pairPin" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="TV pairing code" autocomplete="off"
+        style="flex:1;min-width:0;background:rgba(255,255,255,.08);border:1px solid var(--hair);border-radius:10px;padding:10px;color:white">
+      <button class="primary" id="pairSave">Pair</button>
+    </div>
+  </div>
+  <div class="sub">Weather location</div>
   <div class="group glass">
     <div class="cell"><span class="ic" style="--ibg:#ff4d6d"><svg><use href="#i-pin"/></svg></span><span class="grow"><b id="locName">Automatic</b><span id="locHow">From your internet connection</span></span></div>
   </div>
@@ -426,7 +435,46 @@
   function icon(id) { return '<svg><use href="#i-' + id + '"/></svg>'; }
   var toastTimer;
   function toast(t) { $('toast').textContent = t; $('toast').classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { $('toast').classList.remove('on'); }, 1700); }
-  function send(cmd) { return fetch('/api/command', { method: 'POST', body: JSON.stringify(cmd) }).then(function () { setTimeout(poll, 300); }); }
+  var phoneToken = '';
+  try { phoneToken = localStorage.getItem('haloPhoneToken') || ''; } catch (e) {}
+  var nativeFetch = window.fetch.bind(window);
+  function apiFetch(url, options) {
+    options = options || {};
+    var headers = new Headers(options.headers || {});
+    if (phoneToken && typeof url === 'string' && url.indexOf('/api/') === 0 && url !== '/api/pair') {
+      headers.set('Authorization', 'Bearer ' + phoneToken);
+    }
+    options.headers = headers;
+    return nativeFetch(url, options).then(function (response) {
+      if (response.status === 401) {
+        $('pairStatus').textContent = 'Phone not paired. Enter the code shown on your TV.';
+        document.querySelectorAll('[data-status]').forEach(function (el) {
+          el.textContent = 'Pair phone'; el.classList.remove('on');
+        });
+        throw new Error('Phone not paired');
+      }
+      if (!response.ok) throw new Error('Request failed: ' + response.status);
+      return response;
+    });
+  }
+  $('pairStatus').textContent = phoneToken ? 'Previously paired. Checking connection…' : 'Enter the six-digit code shown on the TV.';
+  $('pairSave').onclick = function () {
+    var pin = $('pairPin').value.trim();
+    if (!/^\d{6}$/.test(pin)) { toast('Enter the six-digit TV code'); return; }
+    nativeFetch('/api/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: pin }) }).then(function (r) {
+      if (!r.ok) throw new Error('Incorrect or expired code. Check the TV.');
+      return r.json();
+    }).then(function (j) {
+      phoneToken = j.token;
+      try { localStorage.setItem('haloPhoneToken', phoneToken); } catch (e) {}
+      $('pairPin').value = '';
+      $('pairStatus').textContent = 'Phone paired successfully.';
+      toast('Connected to HALO TV');
+      poll(); memory();
+    }).catch(function (e) { $('pairStatus').textContent = e.message; toast('Pairing failed'); });
+  };
+  function send(cmd) { return apiFetch('/api/command', { method: 'POST', body: JSON.stringify(cmd) }).then(function () { setTimeout(poll, 300); }); }
 
   // ---------- Tabs.
   document.querySelectorAll('.tab').forEach(function (b) {
@@ -466,7 +514,7 @@
   $('clearQ').onclick = function () { $('q').value = ''; $('clearQ').classList.remove('on'); $('suggest').classList.remove('on'); $('q').focus(); };
 
   function suggest(q) {
-    fetch('/api/suggest?q=' + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (j) {
+    apiFetch('/api/suggest?q=' + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (j) {
       if ($('q').value.trim() !== q) return;
       var list = (j.suggestions || []).slice(0, 6);
       $('suggest').innerHTML = list.map(function (s) {
@@ -490,7 +538,7 @@
     var my = ++seq;
     if (seg !== 'results') document.querySelector('#seg [data-seg=results]').click();
     if (!results.length) $('results').innerHTML = '<div class="spinner"></div>';
-    fetch('/api/search?q=' + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (j) {
+    apiFetch('/api/search?q=' + encodeURIComponent(q)).then(function (r) { return r.json(); }).then(function (j) {
       if (my !== seq) return;
       results = j.results || [];
       $('results').innerHTML = results.length ? results.map(function (r, i) {
@@ -641,7 +689,7 @@
     text = (text || '').trim(); if (!text) return;
     chat.push({ me: true, text: text }); renderChat(true);
     $('askText').value = ''; sizeAsk();
-    fetch('/api/jarvis/ask', { method: 'POST', body: JSON.stringify({ text: text }) }).then(function (r) { return r.json(); })
+    apiFetch('/api/jarvis/ask', { method: 'POST', body: JSON.stringify({ text: text }) }).then(function (r) { return r.json(); })
       .then(function (j) { chat.push({ text: j.reply || 'Sorry, I didn’t get that.' }); })
       .catch(function () { chat.push({ text: 'I can’t reach the TV right now.' }); })
       .then(function () {
@@ -736,13 +784,13 @@
   $('aiSave').onclick = function () {
     var k = $('aiKey').value.trim();
     if (k && !/^sk-/.test(k)) { toast('That doesn’t look like an OpenAI key'); return; }
-    fetch('/api/jarvis/openai', { method: 'POST', body: JSON.stringify({ key: k }) }).then(function (r) { return r.json(); }).then(function (j) {
+    apiFetch('/api/jarvis/openai', { method: 'POST', body: JSON.stringify({ key: k }) }).then(function (r) { return r.json(); }).then(function (j) {
       $('aiKey').value = ''; toast(j.openai ? 'OpenAI connected' : 'OpenAI key removed'); poll();
     }).catch(function () { toast('Couldn’t reach the TV'); });
   };
 
   // ---------- Talk to Jarvis: the link (with this TV's phone key) once the relay is set up for it.
-  fetch('/api/jarvis/talk').then(function (r) { return r.json(); }).then(function (j) {
+  apiFetch('/api/jarvis/talk').then(function (r) { return r.json(); }).then(function (j) {
     if (j.url) { $('talkLink').href = j.url; $('talkLink').hidden = false; }
   }).catch(function () {});
 
@@ -760,7 +808,7 @@
     });
   }
   function memory(change) {
-    fetch('/api/jarvis/memory', change ? { method: 'POST', body: JSON.stringify(change) } : undefined)
+    apiFetch('/api/jarvis/memory', change ? { method: 'POST', body: JSON.stringify(change) } : undefined)
       .then(function (r) { return r.json(); }).then(showMemory).catch(function () {});
   }
   $('memClear').onclick = function () { if (confirm('Forget everything Jarvis remembers about you?')) { memory({ clear: true }); toast('Jarvis has forgotten everything'); } };
@@ -812,7 +860,7 @@
   // ---------- State from the TV.
   var lastQueueKey = '', lastNotesKey = '';
   function poll() {
-    fetch('/api/state').then(function (r) { return r.json(); }).then(function (s) {
+    apiFetch('/api/state').then(function (r) { return r.json(); }).then(function (s) {
       state = s; state.queue = s.queue || []; state.notes = s.notes || [];
       document.querySelectorAll('[data-status]').forEach(function (el) {
         el.textContent = s.tvOnline ? 'TV connected' : 'Ambient closed';
