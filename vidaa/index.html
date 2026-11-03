@@ -9,42 +9,39 @@ main{padding:4vw;min-height:100vh}header{display:flex;justify-content:space-betw
 </style></head><body><main>
 <header><div class="brand">◉ HALO TV</div><div class="tag">VIDAA Browser Edition · Free preview</div></header>
 <div class="grid">
-<section class="card"><div class="label">Local time</div><div class="clock" id="clock">--:--</div><div class="date" id="date">Loading date…</div></section>
+<section class="card"><div class="label">Riga, Latvia · Local time</div><div class="clock" id="clock">--:--</div><div class="date" id="date">Loading date…</div></section>
 <section class="card" id="weather"><div class="label">Weather · Riga</div><div class="temp" id="temp">--°</div><div class="sub" id="conditions">Loading current conditions…</div></section>
 <section class="card wide"><div class="label">Ambient dashboard</div><p class="sub">HALO TV is running directly in your Hisense browser — no APK, external box, or paid service required.</p>
-<div class="actions"><button id="refresh">Refresh weather</button><button id="fullscreen">Full screen</button><button id="settingsBtn">Settings</button></div>
-<div id="settings" hidden style="margin-top:22px"><label class="sub" for="city">Weather location</label><div class="actions"><input id="city" placeholder="City (e.g. Riga)" maxlength="80"><button id="saveCity">Save city</button></div><p class="hint" id="cityStatus">City search uses Open-Meteo.</p></div>
-<div class="diagnostic" id="diag">Checking TV browser compatibility…</div><p class="hint" id="status">This preview includes the clock and live weather. Phone control, Android launcher integration, voice control, and YouTube playback are not enabled in this browser version.</p></section>
+<div class="actions"><button id="refresh">Refresh Riga weather</button><button id="fullscreen">Full screen</button></div>
+<p class="hint" id="status">This preview includes the clock and live weather. Phone control, Android launcher integration, voice control, and YouTube playback are not enabled in this browser version.</p></section>
 <section class="card" style="margin-top:22px"><div class="label">Notes</div><p class="sub">Saved on this TV browser only.</p><div class="actions"><input id="noteInput" maxlength="180" placeholder="Write a reminder"><button id="addNote">Add note</button></div><ul id="notes" class="sub"></ul><p id="noteStatus" class="hint">No notes added yet.</p><p class="hint">Select a note and press OK to remove it.</p></section>
 </div></main>
 <script>
 (function(){
 'use strict';
 function byId(id){return document.getElementById(id);}
-function tick(){try{var d=new Date();byId('clock').textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);byId('date').textContent=d.toDateString();}catch(e){byId('date').textContent='Clock error: '+e.message;}}
+function tick(){try{var d=new Date();var t=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Riga',hour:'2-digit',minute:'2-digit',hour12:false}).format(d);var date=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Riga',weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(d);byId('clock').textContent=t;byId('date').textContent=date+' · Latvia';}catch(e){var d2=new Date();byId('clock').textContent=('0'+d2.getHours()).slice(-2)+':'+('0'+d2.getMinutes()).slice(-2);byId('date').textContent='TV time (Riga timezone unavailable)';}}
 tick();setInterval(tick,1000);
-var savedCity={name:'Riga',latitude:56.9496,longitude:24.1052,timezone:'Europe/Riga'};try{var stored=JSON.parse(localStorage.getItem('halo-city')||'null');if(stored&&typeof stored.latitude==='number'&&typeof stored.longitude==='number')savedCity=stored;}catch(e){}
+var savedCity={name:'Riga, Latvia',latitude:56.9496,longitude:24.1052,timezone:'Europe/Riga'};
 function weather(){
 byId('status').textContent='Checking weather…';
 document.querySelector('#weather .label').textContent='Weather · '+savedCity.name;
-var url='https://api.open-meteo.com/v1/forecast?latitude='+encodeURIComponent(savedCity.latitude)+'&longitude='+encodeURIComponent(savedCity.longitude)+'&current_weather=true&timezone=auto';
+var url='https://api.open-meteo.com/v1/forecast?latitude='+encodeURIComponent(savedCity.latitude)+'&longitude='+encodeURIComponent(savedCity.longitude)+'&current_weather=true&timezone=Europe%2FRiga';
 fetch(url).then(function(r){if(!r.ok)throw Error('Weather service unavailable');return r.json();}).then(function(j){
 var w=j.current_weather;if(!w)throw Error('No weather data');
 byId('temp').textContent=Math.round(w.temperature_2m)+'°';
 byId('conditions').textContent='Wind '+Math.round(w.windspeed)+' km/h · Weather code '+w.weathercode;
-byId('status').textContent='Weather updated. Notes and weather location are stored in this browser.';
+byId('status').textContent='Riga weather updated. Notes are stored in this browser.';
 }).catch(function(){byId('conditions').textContent='Weather unavailable. Check internet access.';byId('status').textContent='Weather request failed; check browser network access.';});
 }
 byId('refresh').onclick=weather;
-byId('settingsBtn').onclick=function(){var p=byId('settings');p.hidden=!p.hidden;if(!p.hidden){byId('city').value=savedCity.name;byId('city').focus();}};
-byId('saveCity').onclick=function(){var name=byId('city').value.trim();if(!name)return;byId('cityStatus').textContent='Searching…';fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&name='+encodeURIComponent(name)).then(function(r){if(!r.ok)throw Error();return r.json();}).then(function(j){if(!j.results||!j.results.length)throw Error();var x=j.results[0];savedCity={name:x.name+(x.country?', '+x.country:''),latitude:x.latitude,longitude:x.longitude,timezone:x.timezone};try{localStorage.setItem('halo-city',JSON.stringify(savedCity));}catch(e){}byId('cityStatus').textContent='Saved: '+savedCity.name;weather();}).catch(function(){byId('cityStatus').textContent='City not found or network unavailable.';});};
 var notes=[];try{var storedNotes=JSON.parse(localStorage.getItem('halo-notes')||'[]');if(Array.isArray(storedNotes))notes=storedNotes.filter(function(x){return typeof x==='string';}).slice(0,12);}catch(e){}
 function renderNotes(){var list=byId('notes');list.textContent='';byId('noteStatus').textContent=notes.length?notes.length+' note(s) saved. Select a note to delete.':'No notes added yet.';notes.forEach(function(n,i){var li=document.createElement('li');var b=document.createElement('button');b.textContent='✕ '+n;b.style.margin='6px';b.onclick=function(){notes.splice(i,1);saveNotes();};li.appendChild(b);list.appendChild(li);});}
 function saveNotes(){try{localStorage.setItem('halo-notes',JSON.stringify(notes));}catch(e){}renderNotes();}
 byId('addNote').onclick=function(){var n=byId('noteInput').value.trim();if(!n){byId('noteStatus').textContent='Enter a note before pressing Add.';return;}if(notes.length>=12){byId('noteStatus').textContent='Maximum 12 notes. Delete one first.';return;}notes.push(n);byId('noteInput').value='';saveNotes();};
 renderNotes();
-document.addEventListener('keydown',function(e){var k=e.keyCode||e.which;var active=document.activeElement;if(k===13&&active&&active.tagName==='INPUT'){e.preventDefault();if(active.id==='city')byId('saveCity').click();if(active.id==='noteInput')byId('addNote').click();}});
-byId('diag').textContent='JavaScript OK · Time '+new Date().toTimeString().slice(0,8)+' · Storage '+(function(){try{localStorage.setItem('halo-test','1');localStorage.removeItem('halo-test');return 'available';}catch(e){return 'restricted';}})();
+document.addEventListener('keydown',function(e){var k=e.keyCode||e.which;var active=document.activeElement;if(k===13&&active&&active.tagName==='INPUT'){e.preventDefault();if(active.id==='noteInput')byId('addNote').click();}});
+byId('diag').textContent='JavaScript OK · Time '+new Date().toTimeString().slice(0,8)+' · Riga time zone Europe/Riga · Storage '+(function(){try{localStorage.setItem('halo-test','1');localStorage.removeItem('halo-test');return 'available';}catch(e){return 'restricted';}})();
 byId('fullscreen').onclick=function(){var el=document.documentElement;if(el.requestFullscreen){var p=el.requestFullscreen();if(p&&p.catch)p.catch(function(){byId('status').textContent='Use the TV browser fullscreen option.';});}else{byId('status').textContent='Use the TV browser fullscreen option.';}};
 weather();setInterval(weather,15*60*1000);
 })();
