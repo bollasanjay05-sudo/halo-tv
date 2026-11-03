@@ -179,6 +179,19 @@ final class RemoteServer {
             send(out, 403, "text/plain", "Local TV only".getBytes(StandardCharsets.UTF_8));
             return;
         }
+        // Browser requests from unrelated sites must not control the TV.
+        // TV sync is handled separately and accepts loopback clients only.
+        String origin = headers.get("origin");
+        if (origin != null && path.startsWith("/api/") && !"/api/tv/sync".equals(path)) {
+            String host = headers.get("host");
+            boolean sameOrigin = host != null
+                    && (origin.equals("http://" + host) || origin.equals("https://" + host));
+            if (!sameOrigin) {
+                send(out, 403, "text/plain; charset=utf-8",
+                        "Cross-origin request blocked".getBytes(StandardCharsets.UTF_8));
+                return;
+            }
+        }
         switch (path) {
             case "/":
                 serveAsset(out, "ambient/phone.html", "text/html; charset=utf-8");
