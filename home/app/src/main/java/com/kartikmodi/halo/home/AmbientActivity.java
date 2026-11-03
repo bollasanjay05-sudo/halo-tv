@@ -9,6 +9,8 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.TextView;
+import android.view.Gravity;
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
 import android.media.AudioTrack;
@@ -39,6 +41,20 @@ import java.util.Locale;
 public class AmbientActivity extends Activity {
 
     private WebView web;
+    private TextView pairingView;
+    private final android.os.Handler pairingHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable pairingRefresh = new Runnable() {
+        @Override public void run() {
+            if (pairingView != null) {
+                boolean paired = getSharedPreferences("halo_remote_auth", MODE_PRIVATE).contains("token_hash");
+                pairingView.setText("HALO TV  •  Pairing code: " + RemoteServer.currentPairingPin(AmbientActivity.this)
+                        + "\nOpen http://" + wifiAddress() + ":8765 on your phone"
+                        + (paired ? "\nPress MENU to show pairing again" : ""));
+                pairingView.setVisibility(paired ? View.GONE : View.VISIBLE);
+                pairingHandler.postDelayed(this, 15000);
+            }
+        }
+    };
     private TurntableView deck;
     private BlobView blob;
     private TextToSpeech tts;
@@ -106,6 +122,17 @@ public class AmbientActivity extends Activity {
         root.addView(web, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         root.addView(deck, new FrameLayout.LayoutParams(1, 1));
         root.addView(blob, new FrameLayout.LayoutParams(1, 1));
+        pairingView = new TextView(this);
+        pairingView.setTextColor(Color.WHITE);
+        pairingView.setTextSize(18);
+        pairingView.setPadding(24, 18, 24, 18);
+        pairingView.setBackgroundColor(0xDD181824);
+        FrameLayout.LayoutParams pairLayout = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.RIGHT);
+        pairLayout.setMargins(16, 16, 24, 16);
+        root.addView(pairingView, pairLayout);
+        pairingRefresh.run();
         deck.setVisibility(View.INVISIBLE);
         blob.setVisibility(View.INVISIBLE);
         web.addJavascriptInterface(new Bridge(), "AmbientNative");
@@ -141,6 +168,14 @@ public class AmbientActivity extends Activity {
     /** Media and colour keys never reach the page on their own; hand them to it by name. */
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
+            if (event.getAction() == KeyEvent.ACTION_UP && pairingView != null) {
+                pairingView.setText("HALO TV  •  Pairing code: " + RemoteServer.currentPairingPin(this)
+                        + "\nOpen http://" + wifiAddress() + ":8765 on your phone");
+                pairingView.setVisibility(View.VISIBLE);
+            }
+            return true;
+        }
         String name = null;
         switch (event.getKeyCode()) {
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
