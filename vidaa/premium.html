@@ -20,7 +20,7 @@ header{padding:10px 6px 22px;border-bottom:1px solid rgba(255,255,255,.12)}
 .deck{height:245px;position:relative;max-width:390px;margin:8px auto 0}
 .record{position:absolute;left:50%;top:8px;margin-left:-112px;width:224px;height:224px;border-radius:50%;border:8px solid #151821;background:repeating-radial-gradient(circle,#151923 0px,#151923 5px,#343747 6px,#151923 8px);box-shadow:0 12px 30px rgba(0,0,0,.55);animation:spin 14s linear infinite}
 .recordCenter{position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px;border-radius:50%;background:radial-gradient(circle,#ffb9be,#c95178);display:flex;align-items:center;justify-content:center;color:#2c1830;font-size:42px;font-weight:bold}
-.tonearm{position:absolute;left:74%;top:12px;width:9px;height:178px;background:linear-gradient(90deg,#b3a8a7,#eee,#827b82);border-radius:8px;transform:rotate(-25deg);transform-origin:top;box-shadow:0 0 8px #111}
+.musicCard .record{animation-play-state:paused}.musicCard.playing .record{animation-play-state:running}#musicVolume{accent-color:#ffb9ce} .tonearm{position:absolute;left:74%;top:12px;width:9px;height:178px;background:linear-gradient(90deg,#b3a8a7,#eee,#827b82);border-radius:8px;transform:rotate(-25deg);transform-origin:top;box-shadow:0 0 8px #111}
 .orb{position:relative;width:200px;height:200px;margin:18px auto;border-radius:50%;background:radial-gradient(circle,rgba(255,156,190,.4),rgba(125,132,255,.1) 60%,transparent 72%);animation:pulse 4s ease-in-out infinite}
 .orbCore{position:absolute;inset:35px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff5f8,#ffa8c6 25%,#8c72d1 65%,#232a5b);box-shadow:0 0 35px rgba(241,142,197,.55),inset -12px -18px 25px rgba(17,21,56,.4)}
 @keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{50%{transform:scale(1.06);filter:brightness(1.12)}}
@@ -31,7 +31,7 @@ header{padding:10px 6px 22px;border-bottom:1px solid rgba(255,255,255,.12)}
 <div class="grid">
 <section class="card"><div class="label">Riga, Latvia · Local time</div><div class="clock" id="clock">--:--</div><div class="date" id="date">Loading date…</div><div class="hint" id="timeStatus">Checking Riga time zone…</div></section>
 <section class="card" id="weather"><div class="label">Weather · Riga</div><div class="temp" id="temp">--°</div><div class="sub" id="conditions">Loading current conditions…</div></section>
-<section class="card musicCard"><div class="label">HALO · TURNTABLE</div><div class="deck"><div class="record"><div class="recordCenter">H</div></div><div class="tonearm"></div></div><p class="sub">Your music station · Player coming in Phase 4</p></section><section class="card jarvisCard"><div class="label">JARVIS · ASSISTANT</div><div class="orb"><div class="orbCore"></div></div><p class="sub">Assistant visualization · Voice integration planned</p></section><section class="card wide"><div class="label">CONTROL CENTER</div><p class="sub">Ambient dashboard · Hisense VIDAA Browser Edition</p>
+<section class="card musicCard"><div class="label">HALO · TURNTABLE</div><div class="deck"><div class="record"><div class="recordCenter">H</div></div><div class="tonearm"></div></div><p class="sub">Original HALO demo melody · Audio compatibility test</p><div class="actions" style="justify-content:center"><button id="musicPlay">▶ Play</button><button id="musicStop">■ Stop</button><button id="musicMute">Mute</button></div><div style="margin:14px auto;max-width:340px"><label for="musicVolume">Volume</label> <input id="musicVolume" type="range" min="0" max="100" value="35" style="min-width:120px;width:65%;vertical-align:middle"></div><p class="hint" id="musicStatus" aria-live="polite">Ready · Press Play on the TV remote</p></section><section class="card jarvisCard"><div class="label">JARVIS · ASSISTANT</div><div class="orb"><div class="orbCore"></div></div><p class="sub">Assistant visualization · Voice integration planned</p></section><section class="card wide"><div class="label">CONTROL CENTER</div><p class="sub">Ambient dashboard · Hisense VIDAA Browser Edition</p>
 <div class="actions"><button id="refresh">Refresh Riga weather</button><button id="fullscreen">Full screen</button></div>
 <div class="diagnostic" id="diag">Checking TV browser compatibility…</div><p class="hint" id="status">This preview includes the clock and live weather. Phone control, Android launcher integration, voice control, and YouTube playback are not enabled in this browser version.</p></section>
 <section class="card wide" style="margin-top:22px"><div class="label">NOTES & REMINDERS</div><p class="sub">Saved on this TV browser only.</p><div class="actions"><input id="noteInput" maxlength="180" placeholder="Write a reminder"><button id="addNote">Add note</button></div><ul id="notes" class="sub"></ul><p id="noteStatus" class="hint">No notes added yet.</p><p class="hint">Select a note and press OK to remove it.</p></section>
@@ -80,6 +80,44 @@ renderNotes();
 document.addEventListener('keydown',function(e){var k=e.keyCode||e.which;var active=document.activeElement;if(k===13&&active&&active.tagName==='INPUT'){e.preventDefault();if(active.id==='noteInput')byId('addNote').click();}});
 byId('diag').textContent='JavaScript OK · Time '+new Date().toTimeString().slice(0,8)+' · Riga time zone Europe/Riga · Storage '+(function(){try{localStorage.setItem('halo-test','1');localStorage.removeItem('halo-test');return 'available';}catch(e){return 'restricted';}})();
 byId('fullscreen').onclick=function(){var el=document.documentElement;if(el.requestFullscreen){var p=el.requestFullscreen();if(p&&p.catch)p.catch(function(){byId('status').textContent='Use the TV browser fullscreen option.';});}else{byId('status').textContent='Use the TV browser fullscreen option.';}};
+// HALO original synthesized melody: browser audio compatibility test, no external audio services.
+var AudioCtx=window.AudioContext||window.webkitAudioContext;
+var audioContext=null,masterGain=null,musicTimer=null,musicIndex=0,musicMuted=false;
+var notesHz=[261.63,329.63,392,523.25,440,392,329.63,293.66,261.63,329.63,392,587.33,523.25,392,329.63,293.66];
+function musicStatus(message){byId('musicStatus').textContent=message;}
+function musicNote(){
+if(!audioContext||!masterGain)return;
+var now=audioContext.currentTime;
+var osc=audioContext.createOscillator(),env=audioContext.createGain();
+osc.type='sine';osc.frequency.value=notesHz[musicIndex%notesHz.length];musicIndex++;
+env.gain.setValueAtTime(0.0001,now);env.gain.exponentialRampToValueAtTime(0.5,now+0.035);
+env.gain.exponentialRampToValueAtTime(0.0001,now+0.33);
+osc.connect(env);env.connect(masterGain);osc.start(now);osc.stop(now+0.35);
+}
+function stopMusic(){
+if(musicTimer!==null){clearInterval(musicTimer);musicTimer=null;}
+byId('musicPlay').textContent='▶ Play';
+document.querySelector('.musicCard').classList.remove('playing');
+musicStatus('Stopped · Press Play to restart');
+}
+byId('musicPlay').onclick=function(){
+if(musicTimer!==null){stopMusic();musicStatus('Paused · Press Play to resume');return;}
+if(!AudioCtx){musicStatus('Audio unavailable: this browser does not support Web Audio.');return;}
+try{
+if(!audioContext){audioContext=new AudioCtx();masterGain=audioContext.createGain();masterGain.connect(audioContext.destination);}
+masterGain.gain.value=musicMuted?0:Number(byId('musicVolume').value)/100;
+var start=function(){
+musicNote();musicTimer=setInterval(musicNote,380);
+byId('musicPlay').textContent='Ⅱ Pause';
+document.querySelector('.musicCard').classList.add('playing');
+musicStatus('Playing original HALO demo melody · TV audio test');
+};
+if(audioContext.state==='suspended'&&audioContext.resume){var p=audioContext.resume();if(p&&p.then){p.then(start).catch(function(){musicStatus('Audio blocked by TV browser. Try pressing Play again.');});}else start();}else start();
+}catch(e){musicStatus('Audio error: '+(e.message||'unsupported browser'));}
+};
+byId('musicStop').onclick=stopMusic;
+byId('musicVolume').oninput=function(){if(masterGain)masterGain.gain.value=musicMuted?0:Number(this.value)/100;};
+byId('musicMute').onclick=function(){musicMuted=!musicMuted;this.textContent=musicMuted?'Unmute':'Mute';if(masterGain)masterGain.gain.value=musicMuted?0:Number(byId('musicVolume').value)/100;};
 weather();setInterval(weather,15*60*1000);
 })();
 </script></body></html>
