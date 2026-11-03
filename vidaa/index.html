@@ -7,7 +7,7 @@ body{background:radial-gradient(ellipse at 75% 20%,#283f67 0%,transparent 48%),r
 main{padding:4vw;min-height:100vh}header{display:flex;justify-content:space-between;align-items:center;gap:20px}.brand{font-size:28px;letter-spacing:5px;font-weight:bold}.tag{color:#b3c4db;font-size:16px}
 .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:22px;margin-top:5vh}.card{background:rgba(255,255,255,.085);border:1px solid rgba(255,255,255,.2);border-radius:26px;padding:34px;box-shadow:0 20px 60px rgba(0,0,0,.15)}.clock{font-size:12vw;font-weight:bold;line-height:1;letter-spacing:-.07em;margin:16px 0}.date{font-size:2.4vw;color:#d0dcf1}.label{font-size:18px;letter-spacing:3px;text-transform:uppercase;color:#9eb6d6}.temp{font-size:8vw;font-weight:bold;margin:24px 0 8px}.sub{font-size:20px;color:#c0d1e7;line-height:1.5}.wide{grid-column:1/-1}.actions{display:flex;gap:16px;flex-wrap:wrap;margin-top:20px}button{background:#dae9ff;color:#13233b;border:0;border-radius:14px;padding:15px 22px;font-size:20px;font-weight:bold;cursor:pointer}button:focus{outline:5px solid #ffbb55;outline-offset:3px}input{min-width:250px;max-width:100%;padding:14px 18px;border-radius:14px;border:2px solid #7286a5;background:#182842;color:#fff;font-size:20px}input:focus{outline:5px solid #ffbb55}button[disabled]{opacity:.5}#settings[hidden]{display:none!important}.diagnostic{padding:12px 0;color:#b6d6ff;font-size:17px}.hint{font-size:15px;color:#a9bcd6;margin-top:20px}#status{color:#ffc984}#weather{min-height:190px}@media(max-width:750px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.card{padding:22px}.clock{font-size:22vw}}
 </style></head><body><main>
-<header><div class="brand">◉ HALO TV</div><div class="tag">VIDAA Browser Edition · Free preview</div></header>
+<header><div class="brand">◉ HALO TV</div><div class="tag">VIDAA Browser Edition · v4 weather diagnostics</div></header>
 <div class="grid">
 <section class="card"><div class="label">Riga, Latvia · Local time</div><div class="clock" id="clock">--:--</div><div class="date" id="date">Loading date…</div><div class="hint" id="timeStatus">Checking Riga time zone…</div></section>
 <section class="card" id="weather"><div class="label">Weather · Riga</div><div class="temp" id="temp">--°</div><div class="sub" id="conditions">Loading current conditions…</div></section>
@@ -24,15 +24,32 @@ function tick(){try{var d=new Date();var t=new Intl.DateTimeFormat('en-GB',{time
 tick();setInterval(tick,1000);
 var savedCity={name:'Riga, Latvia',latitude:56.9496,longitude:24.1052,timezone:'Europe/Riga'};
 function weather(){
-byId('status').textContent='Checking weather…';
-document.querySelector('#weather .label').textContent='Weather · '+savedCity.name;
-var url='https://api.open-meteo.com/v1/forecast?latitude='+encodeURIComponent(savedCity.latitude)+'&longitude='+encodeURIComponent(savedCity.longitude)+'&current_weather=true&timezone=Europe%2FRiga';
-fetch(url).then(function(r){if(!r.ok)throw Error('Weather service unavailable');return r.json();}).then(function(j){
-var w=j.current_weather;if(!w)throw Error('No weather data');
-byId('temp').textContent=Math.round(w.temperature)+'°C';
-byId('conditions').textContent='Wind '+Math.round(w.windspeed)+' km/h · Updated '+(w.time||'unknown')+' (Riga time)';
-byId('status').textContent='Riga weather: Open-Meteo model temperature, which may differ from other weather apps.';
-}).catch(function(){byId('conditions').textContent='Weather unavailable. Check internet access.';byId('status').textContent='Weather request failed; check browser network access.';});
+var temp=byId('temp'),conditions=byId('conditions'),status=byId('status');
+document.querySelector('#weather .label').textContent='Weather · Riga, Latvia';
+conditions.textContent='Connecting to Riga weather service…';
+status.textContent='Requesting live weather data from Open-Meteo.';
+var url='https://api.open-meteo.com/v1/forecast?latitude=56.9496&longitude=24.1052&current_weather=true&timezone=Europe%2FRiga';
+var completed=false;
+var timeout=setTimeout(function(){if(completed)return;completed=true;conditions.textContent='Weather service timed out. Press Refresh Riga weather.';status.textContent='Network timeout: check the TV browser internet connection.';},12000);
+function success(data){
+if(completed)return;
+var w=data&&data.current_weather;
+if(!w||typeof w.temperature!=='number'){failure('Missing temperature data');return;}
+completed=true;clearTimeout(timeout);
+temp.textContent=Math.round(w.temperature)+'°C';
+conditions.textContent='Wind '+Math.round(w.windspeed||0)+' km/h · Updated '+(w.time||'unknown')+' (Riga)';
+status.textContent='Riga weather loaded. Temperature may differ from other weather apps.';
+}
+function failure(message){if(completed)return;completed=true;clearTimeout(timeout);conditions.textContent='Weather unavailable: '+message;status.textContent='Press Refresh Riga weather to retry.';}
+try{
+if(typeof fetch==='function'){
+fetch(url,{cache:'no-store'}).then(function(r){if(!r.ok)throw Error('HTTP '+r.status);return r.json();}).then(success).catch(function(e){failure(e&&e.message||'Network error');});
+}else{
+var xhr=new XMLHttpRequest();xhr.open('GET',url,true);xhr.timeout=11000;
+xhr.onreadystatechange=function(){if(xhr.readyState!==4)return;if(xhr.status===200){try{success(JSON.parse(xhr.responseText));}catch(e){failure('Invalid response');}}else failure('HTTP '+xhr.status);};
+xhr.onerror=function(){failure('Network error');};xhr.ontimeout=function(){failure('Network timeout');};xhr.send();
+}
+}catch(e){failure(e.message||'Browser request error');}
 }
 byId('refresh').onclick=weather;
 var notes=[];try{var storedNotes=JSON.parse(localStorage.getItem('halo-notes')||'[]');if(Array.isArray(storedNotes))notes=storedNotes.filter(function(x){return typeof x==='string';}).slice(0,12);}catch(e){}
