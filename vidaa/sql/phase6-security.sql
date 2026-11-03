@@ -9,6 +9,21 @@ update public.halo_tv_sessions
 set paired_at = now()
 where paired_phone_user_id is not null and paired_at is null;
 
+create or replace function public.halo_set_paired_at()
+returns trigger language plpgsql set search_path = ''
+as $
+begin
+  if new.paired_phone_user_id is distinct from old.paired_phone_user_id then
+    new.paired_at := case when new.paired_phone_user_id is null then null else now() end;
+  end if;
+  return new;
+end;
+$;
+drop trigger if exists halo_set_paired_at_trigger on public.halo_tv_sessions;
+create trigger halo_set_paired_at_trigger
+before update on public.halo_tv_sessions
+for each row execute function public.halo_set_paired_at();
+
 create or replace function public.halo_revoke_phone()
 returns jsonb language plpgsql security definer set search_path = ''
 as $$
@@ -71,5 +86,4 @@ commit;
 -- Run manually in SQL Editor when desired:
 -- select public.halo_cleanup_commands();
 -- For automatic cleanup, schedule this call using Supabase Cron.
--- IMPORTANT: pairing RPC must set paired_at = now() on successful pairing.
--- Until that change is applied, new pairings will not receive commands.
+-- Pairing timestamp is maintained by the trigger above.
