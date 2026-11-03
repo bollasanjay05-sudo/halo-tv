@@ -6,15 +6,35 @@
 body{background:radial-gradient(ellipse at 75% 20%,#283f67 0%,transparent 48%),radial-gradient(ellipse at 10% 90%,#292340 0%,transparent 50%),#080d19}
 main{padding:4vw;min-height:100vh}header{display:flex;justify-content:space-between;align-items:center;gap:20px}.brand{font-size:28px;letter-spacing:5px;font-weight:bold}.tag{color:#b3c4db;font-size:16px}
 .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:22px;margin-top:5vh}.card{background:rgba(255,255,255,.085);border:1px solid rgba(255,255,255,.2);border-radius:26px;padding:34px;box-shadow:0 20px 60px rgba(0,0,0,.15)}.clock{font-size:12vw;font-weight:bold;line-height:1;letter-spacing:-.07em;margin:16px 0}.date{font-size:2.4vw;color:#d0dcf1}.label{font-size:18px;letter-spacing:3px;text-transform:uppercase;color:#9eb6d6}.temp{font-size:8vw;font-weight:bold;margin:24px 0 8px}.sub{font-size:20px;color:#c0d1e7;line-height:1.5}.wide{grid-column:1/-1}.actions{display:flex;gap:16px;flex-wrap:wrap;margin-top:20px}button{background:#dae9ff;color:#13233b;border:0;border-radius:14px;padding:15px 22px;font-size:20px;font-weight:bold;cursor:pointer}button:focus{outline:5px solid #ffbb55;outline-offset:3px}input{min-width:250px;max-width:100%;padding:14px 18px;border-radius:14px;border:2px solid #7286a5;background:#182842;color:#fff;font-size:20px}input:focus{outline:5px solid #ffbb55}button[disabled]{opacity:.5}#settings[hidden]{display:none!important}.diagnostic{padding:12px 0;color:#b6d6ff;font-size:17px}.hint{font-size:15px;color:#a9bcd6;margin-top:20px}#status{color:#ffc984}#weather{min-height:190px}@media(max-width:750px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.card{padding:22px}.clock{font-size:22vw}}
+
+/* Premium HALO ambient theme; CSS-only animations keep VIDAA dependencies minimal. */
+body{background:radial-gradient(ellipse at 77% 22%,#283953 0%,transparent 49%),radial-gradient(ellipse at 12% 88%,#3a2537 0%,transparent 54%),#090d14}
+header{padding:10px 6px 22px;border-bottom:1px solid rgba(255,255,255,.12)}
+.brand{font-size:34px;letter-spacing:7px;color:#f7f7fa;text-shadow:0 0 26px rgba(255,170,185,.25)}
+.tag{letter-spacing:2px}#liveDot{color:#9ef4c4;margin-left:16px;font-size:13px}
+.grid{grid-template-columns:1.35fr 1fr;gap:20px;margin-top:28px}
+.card{background:linear-gradient(145deg,rgba(195,207,224,.19),rgba(64,75,94,.18) 60%,rgba(33,41,61,.34));border:1px solid rgba(235,242,255,.22);border-radius:32px;box-shadow:inset 1px 1px 1px rgba(255,255,255,.19),0 18px 60px rgba(0,0,0,.25)}
+.label{color:#f0b5c3;font-weight:bold;letter-spacing:4px}
+.musicCard,.jarvisCard{min-height:360px;text-align:center}
+.musicCard .label,.jarvisCard .label{text-align:left}
+.deck{height:245px;position:relative;max-width:390px;margin:8px auto 0}
+.record{position:absolute;left:50%;top:8px;margin-left:-112px;width:224px;height:224px;border-radius:50%;border:8px solid #151821;background:repeating-radial-gradient(circle,#151923 0px,#151923 5px,#343747 6px,#151923 8px);box-shadow:0 12px 30px rgba(0,0,0,.55);animation:spin 14s linear infinite}
+.recordCenter{position:absolute;left:50%;top:50%;width:80px;height:80px;margin:-40px;border-radius:50%;background:radial-gradient(circle,#ffb9be,#c95178);display:flex;align-items:center;justify-content:center;color:#2c1830;font-size:42px;font-weight:bold}
+.tonearm{position:absolute;left:74%;top:12px;width:9px;height:178px;background:linear-gradient(90deg,#b3a8a7,#eee,#827b82);border-radius:8px;transform:rotate(-25deg);transform-origin:top;box-shadow:0 0 8px #111}
+.orb{position:relative;width:200px;height:200px;margin:18px auto;border-radius:50%;background:radial-gradient(circle,rgba(255,156,190,.4),rgba(125,132,255,.1) 60%,transparent 72%);animation:pulse 4s ease-in-out infinite}
+.orbCore{position:absolute;inset:35px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff5f8,#ffa8c6 25%,#8c72d1 65%,#232a5b);box-shadow:0 0 35px rgba(241,142,197,.55),inset -12px -18px 25px rgba(17,21,56,.4)}
+@keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{50%{transform:scale(1.06);filter:brightness(1.12)}}
+@media(max-width:750px){.grid{grid-template-columns:1fr}.musicCard,.jarvisCard{min-height:310px}.clock{font-size:22vw}}
+@media(prefers-reduced-motion:reduce){.record,.orb{animation:none}}
 </style></head><body><main>
-<header><div class="brand">◉ HALO TV</div><div class="tag">VIDAA Browser Edition · v4 weather diagnostics</div></header>
+<header><div class="brand">◉ HALO TV</div><div class="tag">VIDAA · AMBIENT EXPERIENCE <span id="liveDot">● LIVE</span></div></header>
 <div class="grid">
 <section class="card"><div class="label">Riga, Latvia · Local time</div><div class="clock" id="clock">--:--</div><div class="date" id="date">Loading date…</div><div class="hint" id="timeStatus">Checking Riga time zone…</div></section>
 <section class="card" id="weather"><div class="label">Weather · Riga</div><div class="temp" id="temp">--°</div><div class="sub" id="conditions">Loading current conditions…</div></section>
-<section class="card wide"><div class="label">Ambient dashboard</div><p class="sub">HALO TV is running directly in your Hisense browser — no APK, external box, or paid service required.</p>
+<section class="card musicCard"><div class="label">HALO · TURNTABLE</div><div class="deck"><div class="record"><div class="recordCenter">H</div></div><div class="tonearm"></div></div><p class="sub">Your music station · Player coming in Phase 4</p></section><section class="card jarvisCard"><div class="label">JARVIS · ASSISTANT</div><div class="orb"><div class="orbCore"></div></div><p class="sub">Assistant visualization · Voice integration planned</p></section><section class="card wide"><div class="label">CONTROL CENTER</div><p class="sub">Ambient dashboard · Hisense VIDAA Browser Edition</p>
 <div class="actions"><button id="refresh">Refresh Riga weather</button><button id="fullscreen">Full screen</button></div>
-<p class="hint" id="status">This preview includes the clock and live weather. Phone control, Android launcher integration, voice control, and YouTube playback are not enabled in this browser version.</p></section>
-<section class="card" style="margin-top:22px"><div class="label">Notes</div><p class="sub">Saved on this TV browser only.</p><div class="actions"><input id="noteInput" maxlength="180" placeholder="Write a reminder"><button id="addNote">Add note</button></div><ul id="notes" class="sub"></ul><p id="noteStatus" class="hint">No notes added yet.</p><p class="hint">Select a note and press OK to remove it.</p></section>
+<div class="diagnostic" id="diag">Checking TV browser compatibility…</div><p class="hint" id="status">This preview includes the clock and live weather. Phone control, Android launcher integration, voice control, and YouTube playback are not enabled in this browser version.</p></section>
+<section class="card wide" style="margin-top:22px"><div class="label">NOTES & REMINDERS</div><p class="sub">Saved on this TV browser only.</p><div class="actions"><input id="noteInput" maxlength="180" placeholder="Write a reminder"><button id="addNote">Add note</button></div><ul id="notes" class="sub"></ul><p id="noteStatus" class="hint">No notes added yet.</p><p class="hint">Select a note and press OK to remove it.</p></section>
 </div></main>
 <script>
 (function(){
